@@ -32,5 +32,15 @@ public class TestRegistry {
         System.out.println("installed " + new Date(time / 10000 - shift));
         // "super complicated" with FILETIME
         // System.out.println("installed " + new WinBase.FILETIME(new WinNT.LARGE_INTEGER(time)).toDate());
+
+        // login user?
+        String user = Advapi32Util.getUserName();
+        System.out.println("user " + user);
+
+        // admin?
+//        Advapi32Util.Account[] accounts = Advapi32Util.getCurrentUserGroups();
+//        for (Advapi32Util.Account a : accounts) {
+//            System.out.println("account: " + a.name + " " + a.accountType);
+//        }
     }
 }
