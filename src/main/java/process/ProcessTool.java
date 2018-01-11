@@ -11,23 +11,22 @@ public class ProcessTool {
     public static void main(String[] args) throws Exception {
 
         // https://github.com/java-native-access/jna/blob/master/contrib/platform/test/com/sun/jna/platform/win32/Kernel32Test.java
+        // https://stackoverflow.com/questions/7018228/how-do-i-redirect-output-to-a-file-with-createprocess
 
-        // need to create PIPE? (cannot use fileHandle in startupInfo, it does "nothing")
-        // https://msdn.microsoft.com/en-us/library/windows/desktop/aa365152(v=vs.85).aspx
-        WinNT.HANDLEByReference outReadPipe = new WinNT.HANDLEByReference();
-        WinNT.HANDLEByReference outWritePipe = new WinNT.HANDLEByReference();
-        checkError(Kernel32.INSTANCE.CreatePipe(outReadPipe, outWritePipe, null, 0), true);
-        WinNT.HANDLEByReference errReadPipe = new WinNT.HANDLEByReference();
-        WinNT.HANDLEByReference errWritePipe = new WinNT.HANDLEByReference();
-        checkError(Kernel32.INSTANCE.CreatePipe(errReadPipe, errWritePipe, null, 0), true);
+        // this is essential. without "inheritance" file have 0 bytes.
+        WinBase.SECURITY_ATTRIBUTES sa = new WinBase.SECURITY_ATTRIBUTES();
+        sa.bInheritHandle = true;
 
         // https://msdn.microsoft.com/en-us/library/windows/desktop/aa363858(v=vs.85).aspx
-        WinNT.HANDLE hFileOut = Kernel32.INSTANCE.CreateFile("d:\\dev\\git\\playground\\out1", WinNT.GENERIC_WRITE, WinNT.FILE_SHARE_WRITE,
-                null, WinNT.CREATE_ALWAYS, WinNT.FILE_ATTRIBUTE_NORMAL, null);
+        WinNT.HANDLE hFileOut = Kernel32.INSTANCE.CreateFile("d:\\dev\\github\\playground\\out1",
+                // append variant
+                WinNT.FILE_APPEND_DATA, WinNT.FILE_SHARE_READ + WinNT.FILE_SHARE_WRITE,
+                sa, WinNT.OPEN_ALWAYS, WinNT.FILE_ATTRIBUTE_NORMAL, null);
 
-        WinNT.HANDLE hFileErr = Kernel32.INSTANCE.CreateFile("d:\\dev\\git\\playground\\err1", WinNT.GENERIC_WRITE, WinNT.FILE_SHARE_WRITE,
-                null, WinNT.CREATE_ALWAYS, WinNT.FILE_ATTRIBUTE_NORMAL, null);
-
+        WinNT.HANDLE hFileErr = Kernel32.INSTANCE.CreateFile("d:\\dev\\github\\playground\\err1",
+                // create variant
+                WinNT.FILE_WRITE_DATA + WinNT.FILE_READ_DATA, WinNT.FILE_SHARE_READ,
+                sa, WinNT.CREATE_ALWAYS, WinNT.FILE_ATTRIBUTE_NORMAL, null);
 
         // https://msdn.microsoft.com/en-us/library/windows/desktop/ms686331(v=vs.85).aspx
         WinBase.STARTUPINFO startupInfo = new WinBase.STARTUPINFO();
@@ -35,14 +34,13 @@ public class ProcessTool {
         startupInfo.hStdError = hFileErr;
         startupInfo.dwFlags = WinBase.STARTF_USESTDHANDLES; // enable handles
 
-        //WinBase.PROCESS_INFORMATION processInformation = new WinBase.PROCESS_INFORMATION();
         WinBase.PROCESS_INFORMATION.ByReference processInformation = new WinBase.PROCESS_INFORMATION.ByReference();
 
         // https://msdn.microsoft.com/en-us/library/windows/desktop/ms682425(v=vs.85).aspx
         boolean result = Kernel32.INSTANCE.CreateProcess(
-                        // "c:\\windows\\notepad.exe",
                         null,
                         "d:\\dev\\bin\\jdk1.8.0_151_x64\\bin\\java.exe -cp target\\classes ShellTest",
+
                         // not working at this level. assume "cmd.exe" is interpreting the ">" etc.
 //                        "d:\\dev\\bin\\jdk1.8.0_151_x64\\bin\\java.exe -cp target\\classes ShellTest > log.txt 2>&1",
 
@@ -52,12 +50,12 @@ public class ProcessTool {
                         null,
                         null,
                         true,
-                         new WinDef.DWORD(WinBase.CREATE_NEW_CONSOLE), // console pops up
-//                         new WinDef.DWORD(WinBase.DETACHED_PROCESS), // working but "output" is invisible
+//                         new WinDef.DWORD(WinBase.CREATE_NEW_CONSOLE), // console pops up
+                         new WinDef.DWORD(WinBase.DETACHED_PROCESS), // working but "output" is invisible
 //                         new WinDef.DWORD(0), // not working?
                         null,
-                        // working directory
-                        "d:\\dev\\git\\playground",
+                        // the working directory
+                        "d:\\dev\\github\\playground",
                         startupInfo,
                         processInformation);
 
@@ -66,9 +64,9 @@ public class ProcessTool {
         int pid = processInformation.dwProcessId.intValue();
         System.out.println("pid=" + pid);
 
-        Thread.sleep(20000);
+        Thread.sleep(10000);
 
-        // this is a "kill", shutdown hook is not triggered?
+        // this is a "kill", shutdown hook is not triggered
         WinNT.HANDLE h = Kernel32.INSTANCE.OpenProcess(WinNT.PROCESS_ALL_ACCESS, false, pid);
         checkError(Kernel32.INSTANCE.TerminateProcess(h, 1), false);
     }
