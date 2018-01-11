@@ -12,19 +12,33 @@ public class ProcessTool {
 
         // https://github.com/java-native-access/jna/blob/master/contrib/platform/test/com/sun/jna/platform/win32/Kernel32Test.java
 
+        // need to create PIPE? (cannot use fileHandle in startupInfo, it does "nothing")
+        // https://msdn.microsoft.com/en-us/library/windows/desktop/aa365152(v=vs.85).aspx
+        WinNT.HANDLEByReference outReadPipe = new WinNT.HANDLEByReference();
+        WinNT.HANDLEByReference outWritePipe = new WinNT.HANDLEByReference();
+        checkError(Kernel32.INSTANCE.CreatePipe(outReadPipe, outWritePipe, null, 0), true);
+        WinNT.HANDLEByReference errReadPipe = new WinNT.HANDLEByReference();
+        WinNT.HANDLEByReference errWritePipe = new WinNT.HANDLEByReference();
+        checkError(Kernel32.INSTANCE.CreatePipe(errReadPipe, errWritePipe, null, 0), true);
+
+        // https://msdn.microsoft.com/en-us/library/windows/desktop/aa363858(v=vs.85).aspx
+        WinNT.HANDLE hFileOut = Kernel32.INSTANCE.CreateFile("d:\\dev\\git\\playground\\out1", WinNT.GENERIC_WRITE, WinNT.FILE_SHARE_WRITE,
+                null, WinNT.CREATE_ALWAYS, WinNT.FILE_ATTRIBUTE_NORMAL, null);
+
+        WinNT.HANDLE hFileErr = Kernel32.INSTANCE.CreateFile("d:\\dev\\git\\playground\\err1", WinNT.GENERIC_WRITE, WinNT.FILE_SHARE_WRITE,
+                null, WinNT.CREATE_ALWAYS, WinNT.FILE_ATTRIBUTE_NORMAL, null);
+
+
+        // https://msdn.microsoft.com/en-us/library/windows/desktop/ms686331(v=vs.85).aspx
+        WinBase.STARTUPINFO startupInfo = new WinBase.STARTUPINFO();
+        startupInfo.hStdOutput = hFileOut;
+        startupInfo.hStdError = hFileErr;
+        startupInfo.dwFlags = WinBase.STARTF_USESTDHANDLES; // enable handles
+
         //WinBase.PROCESS_INFORMATION processInformation = new WinBase.PROCESS_INFORMATION();
         WinBase.PROCESS_INFORMATION.ByReference processInformation = new WinBase.PROCESS_INFORMATION.ByReference();
 
-//        WinNT.HANDLE hFileOut = Kernel32.INSTANCE.CreateFile("d:\\dev\\git\\playground\\out1", WinNT.GENERIC_READ, WinNT.FILE_SHARE_READ,
-//                null, WinNT.OPEN_EXISTING, WinNT.FILE_ATTRIBUTE_NORMAL, null);
-//
-//        WinNT.HANDLE hFileErr = Kernel32.INSTANCE.CreateFile("d:\\dev\\git\\playground\\err1", WinNT.GENERIC_READ, WinNT.FILE_SHARE_READ,
-//                null, WinNT.OPEN_EXISTING, WinNT.FILE_ATTRIBUTE_NORMAL, null);
-
-        WinBase.STARTUPINFO startupInfo = new WinBase.STARTUPINFO();
-//        startupInfo.hStdOutput = hFileOut;
-//        startupInfo.hStdError = hFileErr;
-
+        // https://msdn.microsoft.com/en-us/library/windows/desktop/ms682425(v=vs.85).aspx
         boolean result = Kernel32.INSTANCE.CreateProcess(
                         // "c:\\windows\\notepad.exe",
                         null,
@@ -52,7 +66,7 @@ public class ProcessTool {
         int pid = processInformation.dwProcessId.intValue();
         System.out.println("pid=" + pid);
 
-        Thread.sleep(5000);
+        Thread.sleep(20000);
 
         // this is a "kill", shutdown hook is not triggered?
         WinNT.HANDLE h = Kernel32.INSTANCE.OpenProcess(WinNT.PROCESS_ALL_ACCESS, false, pid);
