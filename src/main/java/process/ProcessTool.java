@@ -5,6 +5,7 @@ import com.sun.jna.platform.win32.Kernel32Util;
 import com.sun.jna.platform.win32.WinBase;
 import com.sun.jna.platform.win32.WinDef;
 import com.sun.jna.platform.win32.WinNT;
+import com.sun.jna.platform.win32.Wincon;
 
 public class ProcessTool {
 
@@ -22,7 +23,8 @@ public class ProcessTool {
 
         Thread.sleep(10000);
 
-        kill(pid);
+         kill(pid);
+//        interrupt(pid);
     }
 
     private static void kill(int pid) {
@@ -34,6 +36,14 @@ public class ProcessTool {
 
     private static void interrupt(int pid) {
         // maybe use GenerateConsoleCtrlEvent to send CTRL-C
+        // checkError(Kernel32.INSTANCE.AttachConsole(pid), true); // error 5: access denied (requires admin?)
+
+        // Kernel32.INSTANCE.SetConsoleCtrlHandler(null, true) missing?
+
+        // https://msdn.microsoft.com/en-us/library/windows/desktop/ms683155(v=vs.85).aspx
+        checkError(Kernel32.INSTANCE.GenerateConsoleCtrlEvent(Wincon.CTRL_C_EVENT, pid), true);
+
+        // Kernel32.INSTANCE.SetConsoleCtrlHandler(null, false); missing?
     }
 
     // return false if process does not exist
@@ -89,7 +99,8 @@ public class ProcessTool {
                 null,
                 true,
                 // new WinDef.DWORD(WinBase.CREATE_NEW_CONSOLE), // console pops up
-                new WinDef.DWORD(WinBase.DETACHED_PROCESS), // working but "output" is invisible
+                new WinDef.DWORD(WinBase.DETACHED_PROCESS),  // working but "output" is invisible
+                //        + WinBase.CREATE_NEW_PROCESS_GROUP),
                 null,
                 workDir,
                 startupInfo,
