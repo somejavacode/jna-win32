@@ -11,20 +11,38 @@ public class ProcessTool {
 
     public static void main(String[] args) throws Exception {
 
-        int pid = start(
-                "d:\\dev\\bin\\jdk1.8.0_151_x64\\bin\\java.exe -cp target\\classes ShellTest",
-                "d:\\dev\\github\\playground",
-                "d:\\dev\\github\\playground\\out1",
-                "d:\\dev\\github\\playground\\err1",
-                false
-        );
-
-        System.out.println("pid=" + pid);
-
-        Thread.sleep(10000);
-
-         kill(pid);
-//        interrupt(pid);
+        if (args.length == 0) {
+            String dev = System.getProperty("user.dir").substring(0, 7); // e.g. "d:\dev\"
+            String java = System.getenv("JAVA_HOME");
+            int pid = start(
+                    java + "\\bin\\java.exe -cp target\\classes ShellTest",
+                    dev + "github\\playground",
+                    "out1",
+                    "err1",
+                    false
+            );
+            System.out.println("pid=" + pid);
+        }
+        else if (args[0].equals("start")) {
+            int pid = start(
+                    args[1],
+                    args[2],
+                    args[3],
+                    args.length > 4 ? args[4] : null,
+                    false
+            );
+            System.out.println("pid=" + pid);
+        }
+        else if (args[0].equals("kill")) {
+            kill(Integer.parseInt(args[1]));
+        }
+        else if (args[0].equals("int")) {
+            interrupt(Integer.parseInt(args[1]));
+        }
+        else if (args[0].equals("check")) {
+            boolean running = check(Integer.parseInt(args[1]));
+            System.out.println("running=" + running);
+        }
     }
 
     private static void kill(int pid) {
@@ -34,22 +52,28 @@ public class ProcessTool {
         checkError(Kernel32.INSTANCE.TerminateProcess(h, 1), true);
     }
 
+    // not working ..
     private static void interrupt(int pid) {
-        // maybe use GenerateConsoleCtrlEvent to send CTRL-C
-        // checkError(Kernel32.INSTANCE.AttachConsole(pid), true); // error 5: access denied (requires admin?)
 
-        // Kernel32.INSTANCE.SetConsoleCtrlHandler(null, true) missing?
+        // error 5: access is denied (same with admin)
+        // checkError(Kernel32.INSTANCE.AttachConsole(pid), true);
+
+        // missing?
+        // Kernel32.INSTANCE.SetConsoleCtrlHandler(null, true)
 
         // https://msdn.microsoft.com/en-us/library/windows/desktop/ms683155(v=vs.85).aspx
+        // OS error #87 The parameter is incorrect.
         checkError(Kernel32.INSTANCE.GenerateConsoleCtrlEvent(Wincon.CTRL_C_EVENT, pid), true);
 
-        // Kernel32.INSTANCE.SetConsoleCtrlHandler(null, false); missing?
+        // missing?
+        // Kernel32.INSTANCE.SetConsoleCtrlHandler(null, false);
     }
 
     // return false if process does not exist
     private static boolean check(int pid) {
         // try to collect as much info as possible
-        return false;
+        WinNT.HANDLE h = Kernel32.INSTANCE.OpenProcess(WinNT.PROCESS_ALL_ACCESS, false, pid);
+        return h != null;
     }
 
     /**
@@ -78,7 +102,7 @@ public class ProcessTool {
         // https://msdn.microsoft.com/en-us/library/windows/desktop/ms686331(v=vs.85).aspx
         WinBase.STARTUPINFO startupInfo = new WinBase.STARTUPINFO();
         startupInfo.hStdOutput = hFileOut;
-        // error to out if no error defined
+        // redirect error to out if no error defined
         startupInfo.hStdError = hFileErr != null ? hFileErr : hFileOut;
         // enable handles
         startupInfo.dwFlags = WinBase.STARTF_USESTDHANDLES;
@@ -99,8 +123,8 @@ public class ProcessTool {
                 null,
                 true,
                 // new WinDef.DWORD(WinBase.CREATE_NEW_CONSOLE), // console pops up
-                new WinDef.DWORD(WinBase.DETACHED_PROCESS),  // working but "output" is invisible
-                //        + WinBase.CREATE_NEW_PROCESS_GROUP),
+                new WinDef.DWORD(WinBase.DETACHED_PROCESS  // working but "output" is invisible
+                        + WinBase.CREATE_NEW_PROCESS_GROUP),
                 null,
                 workDir,
                 startupInfo,
