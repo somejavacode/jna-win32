@@ -16,30 +16,34 @@ public class TestRegistry {
 
         String name = getString(hklm, versionKey, "ProductName");
         String rel = getString(hklm, versionKey, "ReleaseId");
-        String ver = getString(hklm, versionKey, "CurrentBuildNumber");
+        String version = getString(hklm, versionKey, "CurrentVersion");
+        String buildNumber = getString(hklm, versionKey, "CurrentBuildNumber");
         // UBR (Update Build Revision)
-        int ubr = getInt(hklm, versionKey, "UBR");
-        System.out.println(name + " " + rel + " " + ver + "." + ubr);
-        int maj = getInt(hklm, versionKey, "CurrentMajorVersionNumber");
-        int min = getInt(hklm, versionKey, "CurrentMinorVersionNumber");
-        System.out.println("major.minor=" + maj + "." + min);
+        Integer ubr = getInt(hklm, versionKey, "UBR");
+        System.out.println("Name:    " + name);
+        System.out.println("Version: " + version);
+        System.out.println("Release: " + rel);  // null for seven
+        System.out.println("Build:   " + buildNumber + "." + ubr);
+        Integer maj = getInt(hklm, versionKey, "CurrentMajorVersionNumber");
+        Integer min = getInt(hklm, versionKey, "CurrentMinorVersionNumber");
+        System.out.println("major.minor: " + maj + "." + min); // null for seven
 
-        // https://msdn.microsoft.com/en-us/library/ms724284(v=vs.85).aspx
-        // FILETIME structure
-        // Contains a 64-bit value representing the number of 100-nanosecond intervals since January 1, 1601 (UTC).
-        long time = getLong(hklm, versionKey, "InstallTime");
-        // this is broken (one day error), maybe time zone crap
-        //  long shift = new Date(1970, 1, 1).getTime() - new Date(1601, 1, 1).getTime();
-        long shift = 11644473600000L;  // copy from WinBase.java
-        System.out.println("installed=" + new Date(time / 10000 - shift));
-        // "super complicated" with FILETIME
-        // System.out.println("installed " + new WinBase.FILETIME(new WinNT.LARGE_INTEGER(time)).toDate());
+        Long time = getLong(hklm, versionKey, "InstallTime");
+        Date date = null;
+        if (time == null) {
+            // windows7 has "InstallDate" (with different normal scale)
+            date = new Date(getInt(hklm, versionKey, "InstallDate") * 1000L);
+        }
+        else {
+            date = new Date(getJavaMillis(time));
+        }
+        System.out.println("installed: " + date);
 
         // login user?
         String user = Advapi32Util.getUserName();
-        System.out.println("user=" + user);
+        System.out.println("user: " + user);
 
-        // admin?
+        // has user admin rights?
 //        Advapi32Util.Account[] accounts = Advapi32Util.getCurrentUserGroups();
 //        for (Advapi32Util.Account a : accounts) {
 //            System.out.println("account: " + a.name + " " + a.accountType);
@@ -58,8 +62,22 @@ public class TestRegistry {
         return ret;
     }
 
-    private static int getInt(WinReg.HKEY hkey, String path, String key) {
-        int ret = 0;
+    // convert windows FILETIME to java millis (milliseconds since 1.1.1970)
+    private static long getJavaMillis(long time) {
+        // https://msdn.microsoft.com/en-us/library/ms724284(v=vs.85).aspx
+        // FILETIME structure (approx range is  +/-30000 years)
+        // Contains a 64-bit value representing the number of 100-nanosecond intervals since January 1, 1601 (UTC).
+
+        // long shift = new Date(1970, 1, 1).getTime() - new Date(1601, 1, 1).getTime();
+        long shift = 11644473600000L; // copy from WinBase.java
+        return time / 10000 - shift;
+
+        // alternative: "super complicated" with FILETIME
+        // System.out.println("installed " + new WinBase.FILETIME(new WinNT.LARGE_INTEGER(time)).toDate());
+    }
+
+    private static Integer getInt(WinReg.HKEY hkey, String path, String key) {
+        Integer ret = null;
         try {
             ret = Advapi32Util.registryGetIntValue(hkey, path, key);
         }
@@ -70,8 +88,8 @@ public class TestRegistry {
         return ret;
     }
 
-    private static long getLong(WinReg.HKEY hkey, String path, String key) {
-        long ret = 0;
+    private static Long getLong(WinReg.HKEY hkey, String path, String key) {
+        Long ret = null;
         try {
             ret = Advapi32Util.registryGetLongValue(hkey, path, key);
         }
